@@ -1,4 +1,4 @@
-version: '3'
+version: "3.8"
 
 services:
 
@@ -6,45 +6,47 @@ services:
     image: metabase/metabase:v0.52.4
     container_name: metapocket_ui
     ports:
-      - 3080:3000
+      - "3080:3000"
     volumes:
-      - metapocket_data:/data
+      - type: bind
+        source: ./metabase_data
+        target: /metabase_data
+      - type: bind
+        source: ./pb_data
+        target: /pb_shared_data
     environment:
-      - JAVA_OPTS=-Xms512m -Xmx1512m
+      - MB_DB_FILE=/metabase_data/metabase.db
     restart: unless-stopped
-    
-    #network
     networks:
-      - metabase_net
-
-    # helth
+      - metanet
     healthcheck:
       test: curl --fail -I http://localhost:3000/api/health || exit 1
       interval: 15s
       timeout: 5s
       retries: 5
 
-  metabase_server_<customer>:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: metapocket_server_<customer>
-    ports:
-      - 3081:8090
-    environment:
-      - DATA_DIR=/data/<customer>
+  pocketbase:
+    image: alpine
+    container_name: metapocket_pb
+    working_dir: /data
     volumes:
-      - metapocket_data:/data
+      - type: bind
+        source: ./pb_data
+        target: /data
+    entrypoint:
+      - sh
+      - -c
+      - |
+        rm -f pocketbase.zip pocketbase && \
+        wget -q -O pocketbase.zip https://github.com/pocketbase/pocketbase/releases/download/v0.25.0/pocketbase_0.25.0_linux_amd64.zip && \
+        unzip -o pocketbase.zip && \
+        ./pocketbase serve --dir /data --http 0.0.0.0:8090
+    ports:
+      - "3081:8090"
     restart: unless-stopped
-    
-    #network
     networks:
-      - metabase_net
-
-volumes:
-  metapocket_data:
-    driver: local
+      - metanet
 
 networks:
-  metabase_net:
+  metanet:
     driver: bridge
